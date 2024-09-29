@@ -15,8 +15,12 @@ from ezaudio.inference import inference
 from ezaudio.inference_controlnet import inference as inference_cn
 from ezaudio.modules.autoencoder_wrapper import Autoencoder
 from transformers import T5Tokenizer, T5EncoderModel
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+from huggingface_hub import snapshot_download
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+ckpts = os.path.join(now_dir, "ckpts")
+t5_xl_ckpt_dir = os.path.join(ckpts,"flan-t5-xl")
+t5_large_ckpt_dir = os.path.join(ckpts,"flan-t5-large")
 # Load model and configs
 def load_models(config_name, ckpt_path, vae_path, device):
     params = load_yaml_with_includes(config_name)
@@ -28,8 +32,8 @@ def load_models(config_name, ckpt_path, vae_path, device):
     autoencoder.eval()
 
     # Load text encoder
-    tokenizer = T5Tokenizer.from_pretrained(params['text_encoder']['model'])
-    text_encoder = T5EncoderModel.from_pretrained(params['text_encoder']['model']).to(device)
+    tokenizer = T5Tokenizer.from_pretrained(t5_xl_ckpt_dir)
+    text_encoder = T5EncoderModel.from_pretrained(t5_xl_ckpt_dir).to(device)
     text_encoder.eval()
 
     # Load main U-Net model
@@ -62,8 +66,8 @@ def load_cn_models(config_name, ckpt_path, controlnet_path, vae_path, device):
     autoencoder.eval()
 
     # Load text encoder
-    tokenizer = T5Tokenizer.from_pretrained(params['text_encoder']['model'])
-    text_encoder = T5EncoderModel.from_pretrained(params['text_encoder']['model']).to(device)
+    tokenizer = T5Tokenizer.from_pretrained(t5_large_ckpt_dir)
+    text_encoder = T5EncoderModel.from_pretrained(t5_large_ckpt_dir).to(device)
     text_encoder.eval()
 
     # Load main U-Net model
@@ -109,6 +113,13 @@ class TextPromptNode:
         return (text, )
 
 class EzAudioNode:
+    def __init__(self):
+        if not os.path.exists(os.path.join(t5_xl_ckpt_dir,"model-00002-of-00002.safetensors")):
+            snapshot_download(repo_id="google/flan-t5-xl",local_dir=t5_xl_ckpt_dir,
+                              allow_patterns=["*safetensors","*json","*.model"],
+                              force_download=True
+                            )
+        
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -183,7 +194,7 @@ class EzAudioNode:
     def gen_audio(self,prompt,neg_prompt,audio_length,guidance_scale,
                   guidance_rescale,ddim_steps,eta,seed):
         # Model and config paths
-        config_name = os.path.join(now_dir,'ckpts/ezaudio-xl.yml')
+        config_name = os.path.join(now_dir,'ckpts','ezaudio-xl.yml')
         ckpt_path = os.path.join(now_dir,'ckpts/s3/ezaudio_s3_xl.pt')
         vae_path = os.path.join(now_dir,'ckpts/vae/1m.pt')
         autoencoder, unet, tokenizer, text_encoder, noise_scheduler, params = load_models(config_name, ckpt_path, vae_path,device)
@@ -192,13 +203,13 @@ class EzAudioNode:
         print(f"target_sr:{sr}")
 
         gt, gt_mask = None, None
-
+        length = audio_length * params['autoencoder']['latent_sr']
         pred = inference(autoencoder, unet,
                      gt, gt_mask,
                      tokenizer, text_encoder,
                      params, noise_scheduler,
                      prompt, neg_prompt,
-                     audio_length,
+                     length,
                      guidance_scale, guidance_rescale,
                      ddim_steps, eta, seed,
                      device)
@@ -212,6 +223,12 @@ class EzAudioNode:
         return (res_audio,)
 
 class EzAudioEditNode:
+    def __init__(self):
+        if not os.path.exists(os.path.join(t5_xl_ckpt_dir,"model-00002-of-00002.safetensors")):
+            snapshot_download(repo_id="google/flan-t5-xl",local_dir=t5_xl_ckpt_dir,
+                              allow_patterns=["*safetensors","*json","*.model"],
+                              force_download=True
+                            )
     @classmethod
     def INPUT_TYPES(s):
         return {
@@ -378,6 +395,12 @@ class EzAudioEditNode:
         return (res_audio,)
 
 class EzAudioControlNetNode:
+    def __init__(self):
+        if not os.path.exists(os.path.join(t5_large_ckpt_dir,"model.safetensors")):
+            snapshot_download(repo_id="google/flan-t5-large",local_dir=t5_large_ckpt_dir,
+                              allow_patterns=["*safetensors","*json","*.model"],
+                              force_download=True
+                            )
     @classmethod
     def INPUT_TYPES(s):
         return {
