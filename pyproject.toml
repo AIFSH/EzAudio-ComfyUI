@@ -1,0 +1,15 @@
+[project]
+name = "ezaudio-comfyui"
+description = "a custom node for [a/EzAudio](https://github.com/haidog-yaqub/EzAudio)"
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["alias_free_torch", "diffusers", "einops", "librosa", "pandas", "PyYAML", "soundfile", "tqdm", "transformers", "vector_quantize_pytorch", "julius", "torch_stoi", "flatten-dict", "tensorboard", "randomname", "argbind", "sentencepiece", "accelerate"]
+
+[project.urls]
+Repository = "https://github.com/AIFSH/EzAudio-ComfyUI"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "EzAudio-ComfyUI"
+Icon = ""
